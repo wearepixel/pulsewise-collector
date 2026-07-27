@@ -8,6 +8,28 @@ updates:
     open-pull-requests-limit: 10
     groups:
       actions:
+        applies-to: version-updates
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "thursday"
+    open-pull-requests-limit: 10
+    groups:
+      go-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+      go-security:
+        applies-to: security-updates
         patterns: ["*"]
     commit-message:
       prefix: "chore"
