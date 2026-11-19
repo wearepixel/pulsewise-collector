@@ -52,3 +52,25 @@ func TestPHPBranchFromExecutable(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+func TestParseOSReleaseUbuntuLTS(t *testing.T) {
+	got := parseOSRelease("ID=ubuntu\nVERSION_ID=\"22.04\"\nVERSION=\"22.04.5 LTS (Jammy Jellyfish)\"\n")
+	want := &OSInfo{ID: "ubuntu", VersionID: "22.04", LTS: true}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v", got)
+	}
+}
+
+func TestParseOSReleaseDebian(t *testing.T) {
+	got := parseOSRelease("PRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\nID=debian\nVERSION_ID=\"12\"\n")
+	want := &OSInfo{ID: "debian", VersionID: "12"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v", got)
+	}
+}
+
+func TestParseOSReleaseRejectsMissingFields(t *testing.T) {
+	if got := parseOSRelease("ID=debian\n"); got != nil {
+		t.Fatalf("got %+v", got)
+	}
+}

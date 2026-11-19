@@ -17,8 +17,15 @@ const softwareInterval = time.Hour
 type SoftwareInfo struct {
 	Nginx          *NginxSoftware `json:"nginx,omitempty"`
 	PHP            []PHPSoftware  `json:"php,omitempty"`
+	OS             *OSInfo        `json:"os,omitempty"`
 	HeldPackages   []string       `json:"held_packages,omitempty"`
 	RebootRequired bool           `json:"reboot_required"`
+}
+
+type OSInfo struct {
+	ID        string `json:"id"`
+	VersionID string `json:"version_id"`
+	LTS       bool   `json:"lts"`
 }
 
 type NginxSoftware struct {
@@ -84,6 +91,7 @@ func collectSoftware() *SoftwareInfo {
 		})
 	}
 
+	info.OS = installedOS()
 	info.HeldPackages = heldWebPackages()
 	_, err := os.Stat("/var/run/reboot-required")
 	info.RebootRequired = err == nil
@@ -230,4 +238,32 @@ func runningMasterExecutables() masterExecutables {
 	}
 
 	return result
+}
+
+func installedOS() *OSInfo {
+	content, err := os.ReadFile("/etc/os-release")
+	if err != nil {
+		return nil
+	}
+	return parseOSRelease(string(content))
+}
+
+func parseOSRelease(content string) *OSInfo {
+	values := map[string]string{}
+	for _, line := range strings.Split(content, "\n") {
+		key, value, found := strings.Cut(strings.TrimSpace(line), "=")
+		if found {
+			values[key] = strings.Trim(value, `"'`)
+		}
+	}
+
+	if values["ID"] == "" || values["VERSION_ID"] == "" {
+		return nil
+	}
+
+	return &OSInfo{
+		ID:        values["ID"],
+		VersionID: values["VERSION_ID"],
+		LTS:       strings.Contains(values["VERSION"], "LTS"),
+	}
 }
