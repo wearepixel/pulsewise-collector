@@ -93,6 +93,7 @@ type Metrics struct {
 	FPM             *FPMPoolStats    `json:"fpm,omitempty"`
 	Ports           []PortCheck      `json:"ports,omitempty"`
 	Nginx           *NginxStats      `json:"nginx,omitempty"`
+	Software        *SoftwareInfo    `json:"software,omitempty"`
 }
 
 type SystemInfo struct {
@@ -904,6 +905,9 @@ func collectAndSend(config *Config) {
 		return
 	}
 
+	if metrics.Software != nil {
+		markSoftwareSent()
+	}
 	writeLastPulse()
 	log.Printf("Successfully sent metrics at %s", time.Now().Format(time.RFC3339))
 }
@@ -1184,6 +1188,9 @@ func collectMetrics(config *Config) (*Metrics, error) {
 	}
 	if len(config.CheckPorts) > 0 {
 		metrics.Ports = collectPortChecks(config.CheckPorts)
+	}
+	if softwareDue() {
+		metrics.Software = collectSoftware()
 	}
 
 	return metrics, nil
