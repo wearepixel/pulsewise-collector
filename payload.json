@@ -80,7 +80,11 @@
     "time_wait": 18,
     "close_wait": 3,
     "listen": 8,
-    "max_time_wait": 32768
+    "max_time_wait": 32768,
+    "close_wait_connections": [
+      { "process": "php-fpm8.4", "direction": "outbound", "address": "127.0.0.1", "port": 6379, "count": 2 },
+      { "process": "nginx", "direction": "inbound", "port": 443, "count": 1 }
+    ]
   },
   "file_descriptors": {
     "used": 1248,

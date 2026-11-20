@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -125,7 +126,23 @@ type TCPStats struct {
 	CloseWait   int `json:"close_wait"`
 	Listen      int `json:"listen"`
 	MaxTimeWait int `json:"max_time_wait,omitempty"` // Linux only
+
+	CloseWaitConnections []StuckConnection `json:"close_wait_connections,omitempty"`
 }
+
+// StuckConnection groups CLOSE_WAIT sockets: the peer has closed, the local process has not.
+type StuckConnection struct {
+	Process string `json:"process,omitempty"`
+	// "inbound" when the local port is one this server listens on, otherwise "outbound".
+	Direction string `json:"direction"`
+	// Peer address for outbound connections; empty for inbound, where peers are arbitrary clients.
+	Address string `json:"address,omitempty"`
+	// The service port: the local listening port when inbound, the peer's port when outbound.
+	Port  uint32 `json:"port"`
+	Count int    `json:"count"`
+}
+
+const maxStuckConnectionGroups = 10
 
 type FileDescriptors struct {
 	Used int `json:"used"`
@@ -1217,6 +1234,7 @@ func collectTCPStats() *TCPStats {
 			stats.Listen++
 		}
 	}
+	stats.CloseWaitConnections = stuckConnections(conns, processName)
 
 	// Linux: include the system TIME_WAIT bucket limit for context
 	if runtime.GOOS == "linux" {
@@ -1228,6 +1246,72 @@ func collectTCPStats() *TCPStats {
 	}
 
 	return stats
+}
+
+func processName(pid int32) string {
+	if pid <= 0 {
+		return ""
+	}
+	p, err := process.NewProcess(pid)
+	if err != nil {
+		return ""
+	}
+	name, _ := p.Name()
+
+	return name
+}
+
+func stuckConnections(conns []psnet.ConnectionStat, nameOf func(pid int32) string) []StuckConnection {
+	listening := map[uint32]bool{}
+	for _, c := range conns {
+		if c.Status == "LISTEN" {
+			listening[c.Laddr.Port] = true
+		}
+	}
+
+	names := map[int32]string{}
+	groups := map[StuckConnection]int{}
+	for _, c := range conns {
+		if c.Status != "CLOSE_WAIT" {
+			continue
+		}
+		name, seen := names[c.Pid]
+		if !seen {
+			name = nameOf(c.Pid)
+			names[c.Pid] = name
+		}
+
+		group := StuckConnection{Process: name, Direction: "outbound", Address: c.Raddr.IP, Port: c.Raddr.Port}
+		if listening[c.Laddr.Port] {
+			group = StuckConnection{Process: name, Direction: "inbound", Port: c.Laddr.Port}
+		}
+		groups[group]++
+	}
+
+	stuck := make([]StuckConnection, 0, len(groups))
+	for group, count := range groups {
+		group.Count = count
+		stuck = append(stuck, group)
+	}
+	sort.Slice(stuck, func(i, j int) bool {
+		a, b := stuck[i], stuck[j]
+		if a.Count != b.Count {
+			return a.Count > b.Count
+		}
+		if a.Process != b.Process {
+			return a.Process < b.Process
+		}
+		if a.Address != b.Address {
+			return a.Address < b.Address
+		}
+
+		return a.Port < b.Port
+	})
+	if len(stuck) > maxStuckConnectionGroups {
+		stuck = stuck[:maxStuckConnectionGroups]
+	}
+
+	return stuck
 }
 
 func collectFileDescriptors() *FileDescriptors {
