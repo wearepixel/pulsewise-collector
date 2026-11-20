@@ -25,7 +25,7 @@ Every 60 seconds, the collector sends:
 | **Disks** | Per physical mount: device, fstype, total, free, used, usage % (virtual/loop mounts excluded) |
 | **Disk I/O** | Cumulative read/write bytes, read/write count, IOPS in progress |
 | **Network** | Bytes and packets sent/received per second (per-second rate, not cumulative) |
-| **TCP** | Established, TIME_WAIT, CLOSE_WAIT, and LISTEN connection counts |
+| **TCP** | Established, TIME_WAIT, CLOSE_WAIT, and LISTEN connection counts; for CLOSE_WAIT, the owning process and the service it is connected to (top 10 groups) |
 | **File descriptors** | Open fd count and system maximum |
 | **Processes** | Top 10 by CPU: PID, name, command, CPU%, memory%, CPU time, RSS |
 
