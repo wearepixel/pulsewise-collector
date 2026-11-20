@@ -58,3 +58,13 @@ func TestNoStuckConnectionsReportsNothing(t *testing.T) {
 		t.Fatalf("got %+v", got)
 	}
 }
+
+func TestClientAddressIsNotReportedWhenTheListenerHasGone(t *testing.T) {
+	conns := []psnet.ConnectionStat{conn("CLOSE_WAIT", 20, 443, "203.0.113.9", 61000)}
+
+	got := stuckConnections(conns, func(int32) string { return "nginx" })
+	want := []StuckConnection{{Process: "nginx", Direction: "inbound", Port: 443, Count: 1}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v", got)
+	}
+}

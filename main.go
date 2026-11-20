@@ -142,7 +142,12 @@ type StuckConnection struct {
 	Count int    `json:"count"`
 }
 
-const maxStuckConnectionGroups = 10
+const (
+	maxStuckConnectionGroups = 10
+	maxProcessNameLength     = 64
+	// Local ports below this are service ports, not the ephemeral ports a client connects from.
+	ephemeralPortFloor = 32768
+)
 
 type FileDescriptors struct {
 	Used int `json:"used"`
@@ -1257,6 +1262,9 @@ func processName(pid int32) string {
 		return ""
 	}
 	name, _ := p.Name()
+	if runes := []rune(name); len(runes) > maxProcessNameLength {
+		name = string(runes[:maxProcessNameLength])
+	}
 
 	return name
 }
@@ -1282,7 +1290,7 @@ func stuckConnections(conns []psnet.ConnectionStat, nameOf func(pid int32) strin
 		}
 
 		group := StuckConnection{Process: name, Direction: "outbound", Address: c.Raddr.IP, Port: c.Raddr.Port}
-		if listening[c.Laddr.Port] {
+		if listening[c.Laddr.Port] || c.Laddr.Port < ephemeralPortFloor {
 			group = StuckConnection{Process: name, Direction: "inbound", Port: c.Laddr.Port}
 		}
 		groups[group]++
